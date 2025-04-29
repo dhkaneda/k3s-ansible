@@ -32,6 +32,21 @@
         path: /etc/rancher/k3s/config.yaml
         state: absent
 
+    - name: Check if k3s binary exists
+      ansible.builtin.stat:
+        path: /usr/local/bin/k3s
+      register: k3s_binary
+
+    - name: Delete MetalLB namespace and all resources
+      ansible.builtin.command: k3s kubectl delete namespace metallb-system --ignore-not-found=true
+      changed_when: false
+      when: k3s_binary.stat.exists
+
+    - name: Remove MetalLB temp manifest
+      ansible.builtin.file:
+        path: /tmp/metallb-configmap.yaml
+        state: absent
+
 - name: Undo user setup
   hosts: server
   tasks:

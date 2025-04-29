@@ -1,0 +1,4 @@
+---
+# Default IP range for MetalLB address pool
+metallb_ip_range:
+  - 10.0.0.240-10.0.0.250
