@@ -89,7 +89,7 @@ ansible-playbook k3s.orchestration.site -i inventory.yml
 *Running the playbook from inside the repository*
 
 ```bash
-ansible-playbook playbooks/site.yml -i inventory.yml
+ansible-playbook playbooks/site.yml -i inventory.yml -K
 ```
 
 *Running the playbook from inside the repository with sudo*

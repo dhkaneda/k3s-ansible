@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    targetRevision: 5.51.4  # Use the latest stable version
+    chart: argo-cd
+    helm:
+      releaseName: argocd
+      values: |
+        server:
+          service:
+            type: LoadBalancer
+          config:
+            resource.customizations: |
+              networking.k8s.io/Ingress:
+                healthCheck.lua: |
+                  hs = {}
+                  hs.status = "Healthy"
+                  hs.message = "Ingress is healthy"
+                  return hs
+        configs:
+          params:
+            server.insecure: true  # For testing only, use proper TLS in production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

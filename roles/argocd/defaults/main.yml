@@ -1,0 +1,23 @@
+---
+argocd_namespace: argocd
+argocd_release_name: argocd
+argocd_chart_version: 5.51.4
+argocd_repo_url: https://argoproj.github.io/argo-helm
+argocd_chart_name: argo-cd
+
+# Values to customize ArgoCD installation
+argocd_values:
+  server:
+    service:
+      type: LoadBalancer
+    config:
+      resource.customizations: |
+        networking.k8s.io/Ingress:
+          healthCheck.lua: |
+            hs = {}
+            hs.status = "Healthy"
+            hs.message = "Ingress is healthy"
+            return hs
+  configs:
+    params:
+      server.insecure: true  # For testing only, use proper TLS in production

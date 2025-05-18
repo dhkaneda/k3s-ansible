@@ -1,0 +1,49 @@
+---
+- name: Create argocd namespace if it doesn't exist
+  shell: |
+    if ! kubectl get namespace argocd; then
+      kubectl create namespace argocd
+    fi
+  args:
+    executable: /bin/bash
+  register: create_namespace
+  changed_when: create_namespace.rc == 0 or "AlreadyExists" in create_namespace.stderr
+  failed_when: create_namespace.rc != 0 and "AlreadyExists" not in create_namespace.stderr
+
+- name: Install ArgoCD
+  shell: |
+    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+  args:
+    executable: /bin/bash
+  register: argocd_install
+  retries: 3
+  delay: 10
+  until: argocd_install.rc == 0
+
+- name: Create patch file
+  template:
+    src: argocd-server-svc-patch.yaml.j2
+    dest: /tmp/argocd-server-svc-patch.yaml
+    mode: '0644'
+
+- name: Patch ArgoCD service to use LoadBalancer
+  shell: |
+    kubectl patch svc argocd-server -n argocd --patch-file /tmp/argocd-server-svc-patch.yaml
+  args:
+    executable: /bin/bash
+  register: patch_result
+  retries: 3
+  delay: 5
+  until: patch_result.rc == 0
+  ignore_errors: true
+
+- name: Wait for ArgoCD to be ready
+  shell: |
+    kubectl -n argocd wait --for=condition=available deployment/argocd-server --timeout=300s
+  args:
+    executable: /bin/bash
+  register: wait_result
+  retries: 6
+  delay: 10
+  until: wait_result.rc == 0
+  ignore_errors: true

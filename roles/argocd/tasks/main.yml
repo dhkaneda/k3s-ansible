@@ -1,0 +1,3 @@
+---
+- name: Include ArgoCD installation tasks
+  include_tasks: install-argocd.yml
