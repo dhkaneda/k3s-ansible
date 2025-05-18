@@ -170,6 +170,22 @@ kubectl get nodes
 
 If you wish for your kubeconfig to be copied elsewhere and not merged, you can set the `kubeconfig` variable in `inventory.yml` to the desired path.
 
+## ArgoCD Access
+
+After successful installation, you can access ArgoCD through the load balancer endpoint. The admin password can be retrieved using:
+
+```bash
+kubectl get secret -n argocd argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+```
+
+The load balancer endpoint can be found using:
+
+```bash
+kubectl get svc -n argocd argocd-server
+```
+
+The default username is `admin`. Use the password from the secret to log in to the ArgoCD UI.
+
 ## Resetting the cluster
 
 A playbook is provided to reset the cluster. To use it, run one of the following commands. Again, the syntax is slightly different depending on whether you installed `k3s-ansible` with `ansible-galaxy` or if you run the playbook from within the cloned git repository:
