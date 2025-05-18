@@ -1,49 +1,79 @@
 ---
-- name: Create argocd namespace if it doesn't exist
-  shell: |
-    if ! kubectl get namespace argocd; then
-      kubectl create namespace argocd
-    fi
-  args:
-    executable: /bin/bash
-  register: create_namespace
-  changed_when: create_namespace.rc == 0 or "AlreadyExists" in create_namespace.stderr
-  failed_when: create_namespace.rc != 0 and "AlreadyExists" not in create_namespace.stderr
+- name: Check if ArgoCD namespace exists
+  command: kubectl get namespace argocd
+  register: namespace_check
+  ignore_errors: true
+  changed_when: false
+  check_mode: false
 
-- name: Install ArgoCD
-  shell: |
+- name: Create argocd namespace if it doesn't exist
+  command: kubectl create namespace argocd
+  register: create_namespace
+  when: namespace_check.rc != 0
+  changed_when: create_namespace.rc == 0
+  failed_when: false
+  check_mode: false
+
+- name: Check if ArgoCD is already installed
+  command: kubectl get deployment argocd-server -n argocd
+  register: argocd_check
+  ignore_errors: true
+  changed_when: false
+  check_mode: false
+
+- name: Install ArgoCD if not installed
+  command: >
     kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-  args:
-    executable: /bin/bash
+  when: argocd_check.rc != 0
   register: argocd_install
   retries: 3
   delay: 10
   until: argocd_install.rc == 0
+  changed_when: argocd_install.rc == 0
+  check_mode: false
 
-- name: Create patch file
+- name: Create patch file if it doesn't exist
   template:
     src: argocd-server-svc-patch.yaml.j2
     dest: /tmp/argocd-server-svc-patch.yaml
     mode: '0644'
+  register: patch_file
+  changed_when: false
 
-- name: Patch ArgoCD service to use LoadBalancer
-  shell: |
+- name: Check current service type
+  command: kubectl get svc argocd-server -n argocd -o jsonpath='{.spec.type}'
+  register: current_svc_type
+  changed_when: false
+  check_mode: false
+  ignore_errors: true
+
+- name: Patch ArgoCD service to use LoadBalancer if needed
+  command: >
     kubectl patch svc argocd-server -n argocd --patch-file /tmp/argocd-server-svc-patch.yaml
-  args:
-    executable: /bin/bash
+  when: current_svc_type.stdout | default('') != 'LoadBalancer'
   register: patch_result
   retries: 3
   delay: 5
   until: patch_result.rc == 0
-  ignore_errors: true
+  check_mode: false
 
-- name: Wait for ArgoCD to be ready
-  shell: |
+- name: Check if ArgoCD server deployment is available
+  command: >
+    kubectl -n argocd get deployment argocd-server -o jsonpath='{.status.conditions[?(@.type=="Available")].status}'
+  register: argocd_status
+  changed_when: false
+  check_mode: false
+  ignore_errors: true
+  retries: 2
+  delay: 5
+
+- name: Wait for ArgoCD to be ready if not already available
+  command: >
     kubectl -n argocd wait --for=condition=available deployment/argocd-server --timeout=300s
-  args:
-    executable: /bin/bash
   register: wait_result
+  when: argocd_status.stdout | default('') != 'True'
   retries: 6
   delay: 10
   until: wait_result.rc == 0
-  ignore_errors: true
+  changed_when: wait_result.rc == 0
+  check_mode: false

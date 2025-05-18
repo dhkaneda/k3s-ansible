@@ -186,15 +186,23 @@
     manager: auto
 
 # Iptables v1.8.0-1.8.4 have a specific bug with K3s. https://github.com/k3s-io/k3s/issues/3117
-- name: If iptables v1.8.0-1.8.4, warn user  # noqa ignore-errors
-  when:
-    - ansible_facts.packages['iptables'] is defined
-    - ansible_facts.packages['iptables'][0]['version'] is version('1.8.5', '<')
-    - ansible_facts.packages['iptables'][0]['version'] is version('1.7.9', '>')
+- name: Check iptables version
+  ansible.builtin.set_fact:
+    iptables_version: "{{ ansible_facts.packages['iptables'][0]['version'] }}"
+  when: ansible_facts.packages['iptables'] is defined
+  register: iptables_check
+  ignore_errors: true
+
+- name: Warn about problematic iptables version
   ansible.builtin.fail:
-    msg:
-      - "Warning: Iptables {{ ansible_facts.packages['iptables'][0]['version'] }} found."
-      - "Add '--prefer-bundled-bin' to extra_server_args variable to use the bundled iptables binary."
+    msg: |
+      Warning: Iptables {{ iptables_version }} found.
+      Versions 1.8.0-1.8.4 have known issues with K3s.
+      Add '--prefer-bundled-bin' to extra_server_args variable to use the bundled iptables binary.
+  when:
+    - iptables_check is defined and iptables_check is not skipped
+    - (iptables_version | regex_search('^1\.8\.[0-4]($|\D)') is not none) or
+      (iptables_version | regex_search('^1\.8\.0') is not none)
   ignore_errors: true
 
 - name: Add /usr/local/bin to sudo secure_path
@@ -252,3 +260,26 @@
         content: "{{ registries_config_yaml }}"
         dest: "/etc/rancher/k3s/registries.yaml"
         mode: "0644"
+
+- name: Install required Python packages (control plane only)
+  block:
+    - name: Install PyYAML (Arch Linux)
+      ansible.builtin.pacman:
+        name: python-yaml
+        state: present
+      when: ansible_os_family == "Archlinux"
+
+    - name: Install PyYAML (Debian/Ubuntu)
+      ansible.builtin.apt:
+        name: python3-yaml
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install PyYAML (RHEL/CentOS)
+      ansible.builtin.yum:
+        name: python3-pyyaml
+        state: present
+      when: ansible_os_family == "RedHat"
+
+  become: true
+  when: inventory_hostname == groups['server'][0]  # Only run on first server in inventory
