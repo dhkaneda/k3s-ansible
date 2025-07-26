@@ -1,7 +1,30 @@
 # Build a Kubernetes cluster using K3s via Ansible
 
-Author: <https://github.com/itwars>  
-Current Maintainer: <https://github.com/dereknola>
+## Command Quick Reference
+
+Test inventory SSH access with ping
+
+```bash
+ansible all -i inventory.yml -m ping
+```
+
+Run the playbook for installing `k3s`
+
+```bash
+ansible-playbook -K playbooks/site.yml -i inventory.yml
+```
+
+Run playbook for resetting the nodes, uninstalling `k3s`
+
+```bash
+ansible-playbook -K playbooks/reset.yml -i inventory.yml
+```
+
+Run playbook for upgrading `k3s`
+
+```bash
+ansible-playbook playbooks/upgrade.yml -i inventory.yml
+```
 
 Easily bring up a cluster on machines running:
 
